@@ -30,10 +30,21 @@ class RhythmGame {
         
         this.settings = this.loadSettings();
         
+        this.stats = {
+            perfect: 0,
+            great: 0,
+            good: 0,
+            ok: 0,
+            miss: 0,
+            maxCombo: 0,
+            totalNotes: 0
+        };
+        
         this.setupAudio();
         this.setupUploadHandlers();
         this.setupEventListeners();
         this.setupPauseMenu();
+        this.setupResultsScreen();
         this.loadSampleChart();
         this.gameLoop();
         
@@ -362,7 +373,7 @@ class RhythmGame {
         
         beats.sort((a, b) => a.time - b.time);
         
-        const minInterval = 150;
+        const minInterval = 300;
         const filtered = [];
         let lastBeatTime = -minInterval;
         
@@ -375,20 +386,20 @@ class RhythmGame {
         
         console.log(`Filtered beats: ${filtered.length} (from ${beats.length} raw beats)`);
         
-        if (filtered.length < 10) {
+        if (filtered.length < 5) {
             console.warn('Very few beats detected, adding supplementary pattern');
             const supplementary = this.generateSupplementaryBeats(filtered);
             filtered.push(...supplementary);
             filtered.sort((a, b) => a.time - b.time);
         }
         
-        return filtered.slice(0, 300);
+        return filtered.slice(0, 150);
     }
     
     generateFallbackBeats() {
         const duration = this.musicBuffer.duration * 1000;
         const beats = [];
-        const interval = 500;
+        const interval = 800;
         
         for (let time = 1000; time < duration - 1000; time += interval) {
             beats.push({
@@ -412,12 +423,12 @@ class RhythmGame {
         
         const avgInterval = existingBeats.length > 1 ? 
             (existingBeats[existingBeats.length - 1].time - existingBeats[0].time) / (existingBeats.length - 1) : 
-            600;
+            800;
         
-        const targetInterval = Math.max(300, Math.min(800, avgInterval));
+        const targetInterval = Math.max(600, Math.min(1200, avgInterval));
         
-        for (let time = 500; time < duration - 500; time += targetInterval) {
-            const hasNearbyBeat = existingBeats.some(beat => Math.abs(beat.time - time) < 200);
+        for (let time = 1000; time < duration - 1000; time += targetInterval) {
+            const hasNearbyBeat = existingBeats.some(beat => Math.abs(beat.time - time) < 400);
             
             if (!hasNearbyBeat) {
                 supplementary.push({
@@ -445,19 +456,19 @@ class RhythmGame {
             
             if (beatType === 'fallback' || beatType === 'supplementary') {
                 numNotes = 1;
-            } else if (intensity > 0.8) {
-                numNotes = 4;
-            } else if (intensity > 0.6) {
-                numNotes = 3;
-            } else if (intensity > 0.4) {
+            } else if (intensity > 1.2) {
                 numNotes = 2;
+            } else if (intensity > 0.8) {
+                numNotes = Math.random() > 0.7 ? 2 : 1;
             } else {
                 numNotes = 1;
             }
             
-            if (beatType === 'spectral' && intensity > 0.5) {
-                numNotes = Math.min(numNotes + 1, 4);
+            if (beatType === 'spectral' && intensity > 1.0) {
+                numNotes = Math.min(numNotes + 1, 2);
             }
+            
+            numNotes = Math.min(numNotes, 2);
             
             const lanes = this.selectLanes(numNotes, i);
             
@@ -511,10 +522,21 @@ class RhythmGame {
         this.gameTime = 0;
         this.startTime = this.audioContext.currentTime;
         
+        this.stats = {
+            perfect: 0,
+            great: 0,
+            good: 0,
+            ok: 0,
+            miss: 0,
+            maxCombo: 0,
+            totalNotes: 0
+        };
+        
         this.playMusic();
         this.updateUI();
         
         document.getElementById('upload-section').style.display = 'none';
+        document.getElementById('results-screen').classList.add('hidden');
     }
     
     playMusic() {
@@ -542,9 +564,10 @@ class RhythmGame {
     endGame() {
         this.gameStarted = false;
         this.gamePaused = false;
-        document.getElementById('upload-section').style.display = 'flex';
+        this.stats.totalNotes = this.stats.perfect + this.stats.great + this.stats.good + this.stats.ok + this.stats.miss;
+        
         document.getElementById('pause-menu').classList.add('hidden');
-        document.getElementById('upload-status').textContent = `Game Over! Final Score: ${Math.floor(this.score)}`;
+        this.showResults();
     }
     
     setupPauseMenu() {
@@ -600,6 +623,64 @@ class RhythmGame {
         quitBtn.addEventListener('click', () => {
             this.quitToMenu();
         });
+    }
+    
+    setupResultsScreen() {
+        const playAgainBtn = document.getElementById('play-again-btn');
+        const menuBtn = document.getElementById('menu-btn');
+        
+        playAgainBtn.addEventListener('click', () => {
+            this.restartGame();
+        });
+        
+        menuBtn.addEventListener('click', () => {
+            this.quitToMenu();
+        });
+    }
+    
+    showResults() {
+        const accuracy = this.stats.totalNotes > 0 ? 
+            ((this.stats.perfect + this.stats.great + this.stats.good + this.stats.ok) / this.stats.totalNotes * 100) : 0;
+        
+        const grade = this.calculateGrade(accuracy);
+        
+        document.getElementById('final-score').textContent = Math.floor(this.score);
+        document.getElementById('max-combo').textContent = this.stats.maxCombo;
+        document.getElementById('accuracy').textContent = `${accuracy.toFixed(1)}%`;
+        
+        document.getElementById('perfect-count').textContent = this.stats.perfect;
+        document.getElementById('great-count').textContent = this.stats.great;
+        document.getElementById('good-count').textContent = this.stats.good;
+        document.getElementById('ok-count').textContent = this.stats.ok;
+        document.getElementById('miss-count').textContent = this.stats.miss;
+        
+        const gradeElement = document.getElementById('grade-display');
+        gradeElement.textContent = grade;
+        gradeElement.style.color = this.getGradeColor(grade);
+        gradeElement.style.borderColor = this.getGradeColor(grade);
+        
+        document.getElementById('results-screen').classList.remove('hidden');
+    }
+    
+    calculateGrade(accuracy) {
+        if (accuracy >= 95) return 'S';
+        if (accuracy >= 90) return 'A';
+        if (accuracy >= 80) return 'B';
+        if (accuracy >= 70) return 'C';
+        if (accuracy >= 60) return 'D';
+        return 'F';
+    }
+    
+    getGradeColor(grade) {
+        switch (grade) {
+            case 'S': return '#ff69b4';
+            case 'A': return '#00ff00';
+            case 'B': return '#ffff00';
+            case 'C': return '#ffa500';
+            case 'D': return '#ff6464';
+            case 'F': return '#808080';
+            default: return '#ffffff';
+        }
     }
     
     togglePause() {
@@ -662,6 +743,7 @@ class RhythmGame {
         this.gameStarted = false;
         this.gamePaused = false;
         document.getElementById('pause-menu').classList.add('hidden');
+        document.getElementById('results-screen').classList.add('hidden');
         document.getElementById('upload-section').style.display = 'flex';
         this.notes = [];
         this.particles = [];
@@ -738,9 +820,19 @@ class RhythmGame {
     }
     
     calculateScore(timing) {
-        if (timing <= 15) return 300; // Perfect
-        if (timing <= 30) return 200; // Great
-        if (timing <= 50) return 100; // Good
+        if (timing <= 15) {
+            this.stats.perfect++;
+            return 300; // Perfect
+        }
+        if (timing <= 30) {
+            this.stats.great++;
+            return 200; // Great
+        }
+        if (timing <= 50) {
+            this.stats.good++;
+            return 100; // Good
+        }
+        this.stats.ok++;
         return 50; // OK
     }
     
@@ -750,6 +842,9 @@ class RhythmGame {
     
     updateScore(points) {
         this.score += points * (1 + this.combo * 0.1);
+        if (this.combo > this.stats.maxCombo) {
+            this.stats.maxCombo = this.combo;
+        }
     }
     
     updateUI() {
@@ -799,6 +894,33 @@ class RhythmGame {
         if (score >= 200) return 'GREAT';
         if (score >= 100) return 'GOOD';
         return 'OK';
+    }
+    
+    createMissEffect(x, y) {
+        this.particles.push({
+            x: x,
+            y: y - 20,
+            vx: 0,
+            vy: -1,
+            life: 1.0,
+            decay: 0.015,
+            color: '#ff4444',
+            size: 16,
+            text: 'MISS'
+        });
+        
+        for (let i = 0; i < 5; i++) {
+            this.particles.push({
+                x: x,
+                y: y,
+                vx: (Math.random() - 0.5) * 6,
+                vy: (Math.random() - 0.5) * 6 - 1,
+                life: 0.8,
+                decay: 0.025,
+                color: '#666666',
+                size: Math.random() * 3 + 1
+            });
+        }
     }
     
     updateParticles() {
@@ -894,9 +1016,11 @@ class RhythmGame {
             const note = this.notes[i];
             note.y += this.noteSpeed * this.settings.gameSpeed;
             
-            if (note.y > this.canvas.height + 50) {
+            if (note.y > this.hitZone + 80) {
                 this.notes.splice(i, 1);
+                this.stats.miss++;
                 this.combo = 0;
+                this.createMissEffect(note.x, this.hitZone);
                 this.updateUI();
             }
         }
