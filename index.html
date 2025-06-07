@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>4K Rhythm Game</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="game-container">
+        <div id="upload-section">
+            <input type="file" id="music-upload" accept="audio/*" style="display: none;">
+            <button id="upload-btn">Upload Music</button>
+            <button id="start-btn" disabled>Start Game</button>
+            <div id="upload-status">Upload a music file to auto-generate notes!</div>
+            <div id="progress-container" class="hidden">
+                <div id="progress-bar">
+                    <div id="progress-fill"></div>
+                </div>
+                <div id="progress-text">0%</div>
+            </div>
+        </div>
+        <div id="score-display">
+            <div id="score">Score: 0</div>
+            <div id="combo">Combo: 0</div>
+            <div id="song-info"></div>
+        </div>
+        <canvas id="game-canvas"></canvas>
+        <div id="pause-menu" class="hidden">
+            <div class="pause-content">
+                <h2>Game Paused</h2>
+                <div class="settings">
+                    <div class="setting-item">
+                        <label for="volume-slider">Music Volume:</label>
+                        <input type="range" id="volume-slider" min="0" max="100" value="50">
+                        <span id="volume-value">50%</span>
+                    </div>
+                    <div class="setting-item">
+                        <label for="speed-slider">Game Speed:</label>
+                        <input type="range" id="speed-slider" min="50" max="200" value="100">
+                        <span id="speed-value">100%</span>
+                    </div>
+                    <div class="setting-item">
+                        <label for="hit-volume-slider">Hit Sound Volume:</label>
+                        <input type="range" id="hit-volume-slider" min="0" max="100" value="30">
+                        <span id="hit-volume-value">30%</span>
+                    </div>
+                </div>
+                <div class="pause-buttons">
+                    <button id="resume-btn">Resume (ESC)</button>
+                    <button id="restart-btn">Restart</button>
+                    <button id="quit-btn">Quit to Menu</button>
+                </div>
+            </div>
+        </div>
+        <div id="controls">
+            <div class="key-display" data-key="d">D</div>
+            <div class="key-display" data-key="f">F</div>
+            <div class="key-display" data-key="j">J</div>
+            <div class="key-display" data-key="k">K</div>
+        </div>
+    </div>
+    <script src="game.js"></script>
+</body>
+</html>
